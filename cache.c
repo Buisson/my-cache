@@ -18,8 +18,9 @@
  struct Cache *Cache_Create(const char *fic, unsigned nblocks, unsigned nrecords,
  	size_t recordsz, unsigned nderef){
 
- 	struct Cache cache;
-	cache->file = fic;					//!< Nom du fichier   
+ 	struct Cache *cache = (struct Cache*) malloc(sizeof(struct Cache));
+ 	
+	cache->file=basename(fic);			//!< Nom du fichier   
 	cache->FILE = fopen(fic, "a+");		//!< Pointeur sur fichier, option 'a+' (Opens a file for reading and appending.)
 	cache.nblocks = nblocks;			//!< Nb de blocs dans le cache
 	cache.nrecords = nrecords;			//!< Nombre d'enregistrements dans chaque bloc
