@@ -29,3 +29,10 @@
 
 # Debug files
 *.dSYM/
+
+#Temporary files
+*~
+
+#Others
+Plots/
+plot

@@ -10,7 +10,6 @@
 
 # Libraries
 *.lib
-*.a
 *.la
 *.lo
 
@@ -30,3 +29,6 @@
 
 # Debug files
 *.dSYM/
+
+#Temporary files
+*~
