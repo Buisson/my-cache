@@ -32,13 +32,15 @@ unsigned int getPriority(struct Cache_Block_Header *bloc) {
  */
 void Deref (struct Cache *pcache)
 {
+	struct pstrategy *strategy = (struct pstrategy *)(pcache)->pstrategy;
+	if (strategy->nderef == 0 || --strategy->cptderef > 0) return;
 
-	if (pcache->nderef == 0) return;
-
-		// On met le flag REFER à 0 à tous les blocs
-		for (int i = 0; i < pcache->nblocks; ++i) 
-			pcache->headers[i].flags &= ~REFER;
-		++pcache->instrument.n_deref;
+	// On met le flag REFER à 0 à tous les blocs
+	for (int i = 0; i < pcache->nblocks; ++i) 
+		pcache->headers[i].flags &= ~REFER;
+	// on réinitialise le compteur
+	strategy->cptderef = strategy->nderef;
+	++pcache->instrument.n_deref;
 	
 }
 
@@ -49,7 +51,7 @@ void *Strategy_Create(struct Cache *pcache)
 	struct pstrategy *strategy = malloc(sizeof(struct pstrategy));
 	// Initialisation des champs de la structure
 	strategy->nderef = pcache->nderef;
-	strategy->cptderef = 0;
+	strategy->cptderef = pcache->nderef;
 	return strategy;
 }
 
@@ -66,7 +68,11 @@ void Strategy_Close(struct Cache *pcache)
  */
 void Strategy_Invalidate(struct Cache *pcache) 
 {
-	Deref(pcache);  
+	struct pstrategy *strategy = (struct pstrategy *)(pcache)->pstrategy;
+	if (strategy->nderef != 0) {
+		  strategy->cptderef = 1;
+		  Deref(pcache);
+	}  
 }
 
 /* NUR : Stratégie de remplacement de bloc
@@ -77,14 +83,17 @@ struct Cache_Block_Header *Strategy_Replace_Block(struct Cache *pcache)
 {
 	struct Cache_Block_Header *pbh_save = NULL;
 	struct  Cache_Block_Header *pbh;
-	int rm;
+
+	
 	/* On cherche d'abord un bloc invalide */
 	if ((pbh = Get_Free_Block(pcache)) != NULL) 
 		return pbh;
+	
+	int rm;
+	unsigned int rm_min = 5;
 	//à partir de là on commence l'algorithme concret de NUR
 	// On parcourt tout les blocks pour trouver celui qui nous intéresse
-	int i;
-	for (unsigned int rm_min = 4; i < pcache->nblocks; ++i)
+	for (int i = 0; i < pcache->nblocks; ++i)
 	{
 		struct Cache_Block_Header *cachi = &pcache->headers[i];
 		//on cherche rm minimal
@@ -107,10 +116,8 @@ struct Cache_Block_Header *Strategy_Replace_Block(struct Cache *pcache)
  */
 void Strategy_Read(struct Cache *pcache, struct Cache_Block_Header *pbh) 
 {
-	struct pstrategy *strategy = (struct pstrategy*)(pcache)->pstrategy;
 	// Si le compteur de déréférencements est égal à nderef, on réinitialise
-	if((++strategy->cptderef) == strategy->nderef)
-		Deref(pcache);
+	Deref(pcache);
 	pbh->flags |= REFER;
 } 
   
@@ -119,10 +126,8 @@ void Strategy_Read(struct Cache *pcache, struct Cache_Block_Header *pbh)
  */
 void Strategy_Write(struct Cache *pcache, struct Cache_Block_Header *pbh)
 {
-	struct pstrategy *strategy = (struct pstrategy*)(pcache)->pstrategy;
 	// Si le compteur de déréférencements est égal à nderef, on réinitialise
-	if((++strategy->cptderef) == strategy->nderef)
-		Deref(pcache);
+	Deref(pcache);
 	pbh->flags |= REFER;
 } 
 
