@@ -14,8 +14,8 @@
 // Flag Reférence
 #define REFER 0b100
 
-unsigned int getPriority(int r, int m) {
-	return ( r * 2 ) + m;
+unsigned int getPriority(struct Cache_Block_Header *bloc) {
+	return ((bloc->flags & REFER) ? 1:0) *2 + ((bloc->flags & MODIF) ? 1:0);
 }
 
 /* NUR : déréférençage
@@ -24,7 +24,7 @@ unsigned int getPriority(int r, int m) {
 void Deref (struct Cache *pcache)
 {
 
-	if (pcache->nderef > 0 ) {
+	if (pcache->nderef 0 ) {
 		// On met le flag REFER à 0 à tous les blocs
 		for (int i = 0; i < pcache->nblocks; ++i) 
 			pcache->headers[i].flags &= ~REFER;
@@ -44,7 +44,7 @@ void *Strategy_Create(struct Cache *pcache)
  */
 void Strategy_Close(struct Cache *pcache)
 {
-	free(pcache->pstrategy);
+	//free(pcache->pstrategy);
 }
 
 /* NUR : Invalidate
@@ -61,30 +61,28 @@ void Strategy_Invalidate(struct Cache *pcache)
  */
 struct Cache_Block_Header *Strategy_Replace_Block(struct Cache *pcache) 
 {
-	int ib;
-	int min;
+	int rm_min;
 	struct Cache_Block_Header *pbh_save = NULL;
 	struct  Cache_Block_Header *pbh;
 	int rm;
-	//On cherche d'abord un bloc invalide
+	/* On cherche d'abord un bloc invalide */
 	if ((pbh = Get_Free_Block(pcache)) != NULL) 
 		return pbh;
 	//à partir de là on commence l'algorithme concret de NUR
 	// On parcourt tout les blocks pour trouver celui qui nous intéresse
-	for (min = getPriority(1, 1) + 1, ib = 0; ib < pcache->nblocks; ib++)
+	for (int i = 0 ; i < pcache->nblocks; ++i)
 	{
-		pbh = &pcache->headers[ib];
-
+		struct Cache_Block_Header *cachi = &pcache->headers[i];
 		//on cherche rm minimal
-		rm = getPriority(pbh->flags & REFER, pbh->flags & MODIF);
+		rm_min = getPriority(cachi);
 		// si rm vaut 0 alors on ne peut pas trouver plus petit
 		if (rm == 0) 
-			return pbh;
+			return cachi;
 		// s'il est plus petit que celui qu'on a, on le stocke
-		if (rm < min) 
+		if (rm < rm_min) 
 		{
-			min = rm;
-			pbh_save = pbh;
+			rm_min = rm;
+			pbh_save = cachi;
 		}	
 	}
 	return pbh_save;    
@@ -95,7 +93,8 @@ struct Cache_Block_Header *Strategy_Replace_Block(struct Cache *pcache)
  */
 void Strategy_Read(struct Cache *pcache, struct Cache_Block_Header *pbh) 
 {
-	Deref(pcache);
+	if (++pcache->pstrategy >= pcache->nderef)
+		Deref(pcache);
 	pbh->flags |= REFER;
 } 
   
@@ -104,7 +103,8 @@ void Strategy_Read(struct Cache *pcache, struct Cache_Block_Header *pbh)
  */
 void Strategy_Write(struct Cache *pcache, struct Cache_Block_Header *pbh)
 {
-	Deref(pcache);
+if ((++pcache->pstrategy) >= pcache->nderef)
+		Deref(pcache);
 	// On met le flaf REFER à 1
 	pbh->flags |= REFER;
 } 
