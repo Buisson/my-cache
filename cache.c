@@ -11,7 +11,7 @@
 
 //! Calcul du hit rate
  int Hit_Rate_Compute(struct Cache *pcache){
- 	return pcache.instrument.n_hits / (pcache.instrument.n_reads + pcache.instrument.n_writes)
+ 	return pcache.instrument->n_hits / (pcache.instrument->n_reads + pcache.instrument->n_writes)
  }
 
 //! Création du cache.
@@ -20,26 +20,26 @@
 
  	struct Cache *cache = (struct Cache*) malloc(sizeof(struct Cache));
 
-	cache->file=basename(fic);			//!< Nom du fichier   
+	cache->file = basename(fic);		//!< Nom du fichier   
 	cache->FILE = fopen(fic, "a+");		//!< Pointeur sur fichier, option 'a+' (Opens a file for reading and appending.)
-	cache.nblocks = nblocks;			//!< Nb de blocs dans le cache
-	cache.nrecords = nrecords;			//!< Nombre d'enregistrements dans chaque bloc
-	cache.recordsz = recordsz;			//!< Taille d'un enregistrement
-	cache.blocksz = recordsz*nrecords; 	//!< Taille d'un bloc.
-	cache.nderef = nderef;				//!< période de déréférençage pour NUR 
+	cache->nblocks = nblocks;			//!< Nb de blocs dans le cache
+	cache->nrecords = nrecords;			//!< Nombre d'enregistrements dans chaque bloc
+	cache->recordsz = recordsz;			//!< Taille d'un enregistrement
+	cache->blocksz = recordsz*nrecords; //!< Taille d'un bloc.
+	cache->nderef = nderef;				//!< période de déréférençage pour NUR 
 	//cache->pstrategy = NULL;			//!< Structure de données dépendant de la stratégie
 
 	struct Cache_Instrument instrument;
-	instrument.n_reads = 0; 	//!< Nombre de lectures.
-    instrument.n_writes = 0;	//!< Nombre d'écritures.
-    instrument.n_hits = 0;		//!< Nombre de fois où l'élément était déjà dans le cache.
-    instrument.n_syncs = 0;		//<! Nombre d'appels à Cache_Sync().
-    instrument.n_deref = 0;
+	instrument->n_reads = 0; 	//!< Nombre de lectures.
+    instrument->n_writes = 0;	//!< Nombre d'écritures.
+    instrument->n_hits = 0;		//!< Nombre de fois où l'élément était déjà dans le cache->
+    instrument->n_syncs = 0;	//<! Nombre d'appels à Cache_Sync().
+    instrument->n_deref = 0;
 
-    cache.instrument = instrument;
+    cache->instrument = instrument;
 
 	struct Cache_Block_Header *headers = (struct Cache_Block_Header*) malloc(sizeof(struct Cache_Block_Header)*nblocks);
-	for(int i=0 ; i< nblocks ; i++){
+	for(int i=0 ; i < nblocks ; i++){
 		(headers+i)->flags=VALID;
 		(headers+i)->ibfile=0;
 		(headers+i)->ibcache=0;
