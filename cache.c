@@ -110,4 +110,3 @@ struct Cache_Instrument *Cache_Get_Instrument(struct Cache *pcache){
 
 };
 
-#endif /* _CACHE_H_ */
