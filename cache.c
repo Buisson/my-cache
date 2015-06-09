@@ -15,10 +15,10 @@
  }
 
 //! Création du cache.
-struct Cache *Cache_Create(const char *fic, unsigned nblocks, unsigned nrecords,
-                           size_t recordsz, unsigned nderef){
+ struct Cache *Cache_Create(const char *fic, unsigned nblocks, unsigned nrecords,
+ 	size_t recordsz, unsigned nderef){
 
-	struct Cache cache;
+ 	struct Cache cache;
 	cache->file = fic;					//!< Nom du fichier   
 	cache->FILE = fopen(fic, "a+");		//!< Pointeur sur fichier, option 'a+' (Opens a file for reading and appending.)
 	cache.nblocks = nblocks;			//!< Nb de blocs dans le cache
@@ -35,7 +35,7 @@ struct Cache *Cache_Create(const char *fic, unsigned nblocks, unsigned nrecords,
     instrument.n_syncs = 0;		//<! Nombre d'appels à Cache_Sync().
     instrument.n_deref = 0;
 
-	cache.instrument = instrument;
+    cache.instrument = instrument;
 
 	//Je crois qu'on a pas besoin de ça ici
     //struct Cache_Block_Header *pfree;   //!< Premier bloc libre (invalide) 
@@ -45,7 +45,10 @@ struct Cache *Cache_Create(const char *fic, unsigned nblocks, unsigned nrecords,
 
 //! Fermeture (destruction) du cache.
 Cache_Error Cache_Close(struct Cache *pcache){
-	
+	free(pcache->headers);
+	free(pcache->pfree);
+	free(pcache);
+	return CACHE_OK;
 };
 
 //! Synchronisation du cache.
@@ -72,8 +75,8 @@ Cache_Error Cache_Write(struct Cache *pcache, int irfile, const void *precord){
 /*!
  * \ingroup cache_interface
  */
-struct Cache_Instrument
-{
+ struct Cache_Instrument
+ {
     unsigned n_reads; 	//!< Nombre de lectures.
     unsigned n_writes;	//!< Nombre d'écritures.
     unsigned n_hits;	//!< Nombre de fois où l'élément était déjà dans le cache.
