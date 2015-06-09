@@ -32,3 +32,9 @@
 
 #Temporary files
 *~
+
+#Others
+Plots/
+plot
+tst*
+foo

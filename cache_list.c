@@ -67,7 +67,12 @@ struct Cache_Block_Header *Cache_List_Remove_Last(struct Cache_List *list){
 struct Cache_Block_Header *Cache_List_Remove(struct Cache_List *list,struct Cache_Block_Header *pbh){
 	struct Cache_List * tmp;
 	while((tmp = list->next) != list){
-		
+		if((tmp->pheader)==pbh){
+			tmp->prev->next = tmp->next;
+			tmp->next->prev = tmp->prev;
+			free(tmp);
+			break;
+		}
 	}
 }
 
