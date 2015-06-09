@@ -18,35 +18,28 @@ unsigned int getPriority(int r, int m) {
 	return ( r * 2 ) + m;
 }
 
-/* Déréférençage si besoin
- * -----------------------
- * On remet à 0 le bit de référence tous les deref accès.
+/* NUR : déréférençage
+ * pour pcache->nderef > 0
  */
 void Deref (struct Cache *pcache)
 {
 
 	if (pcache->nderef > 0 ) {
-
 		// On met le flag REFER à 0 à tous les blocs
 		for (int i = 0; i < pcache->nblocks; ++i) 
 			pcache->headers[i].flags &= ~REFER;
-
 		++pcache->instrument.n_deref;
 	}
 }
 
-/* initialisation de la stratégie
- * ------------------------------
- * On alloue une structure contenant le compteur de déréférençage (cptderf)
- * ainsi que la valeur maximale de ce dernier (nderef) qui constitue la
- * "période" de déréférençage.
-*/
+/* NUR : initialisation
+ */
 void *Strategy_Create(struct Cache *pcache) 
 {
 	return pcache->pstrategy = (int*)0;
 }
 
-/* Strategy_Close
+/* NUR : Strategy_Close
  * On libère l'espace alloué
  */
 void Strategy_Close(struct Cache *pcache)
@@ -54,19 +47,17 @@ void Strategy_Close(struct Cache *pcache)
 	free(pcache->pstrategy);
 }
 
-/* Invalidation du cache
- * ---------------------
- * On force la remise à zéro des bits de référence.
-*/
+/* NUR : Invalidate
+ * Remise à zéro des bits de référence
+ */
 void Strategy_Invalidate(struct Cache *pcache) 
 {
 	Deref(pcache);  
 }
 
-/* Algorithme de remplacement de bloc
- * ---------------------------------- 
- * On prend le premier bloc invalide. S'il n'y en a plus on cherche un bloc non
- * référencé dans la dernière tranche de temps (et de préférence non modifié).
+/* NUR : Stratégie de remplacement de bloc
+ * Renvoie le premier block invalide ou celui avec le rm le plus petit
+ * (référencé dans la dernière tranche de temps puis non modifié)
  */
 struct Cache_Block_Header *Strategy_Replace_Block(struct Cache *pcache) 
 {
@@ -75,21 +66,21 @@ struct Cache_Block_Header *Strategy_Replace_Block(struct Cache *pcache)
 	struct Cache_Block_Header *pbh_save = NULL;
 	struct  Cache_Block_Header *pbh;
 	int rm;
-	/* On cherche d'abord un bloc invalide */
+	//On cherche d'abord un bloc invalide
 	if ((pbh = Get_Free_Block(pcache)) != NULL) 
 		return pbh;
-	/* à partir de là on commence l'algorithme concret de NUR */
+	//à partir de là on commence l'algorithme concret de NUR
 	// On parcourt tout les blocks pour trouver celui qui nous intéresse
 	for (min = getPriority(1, 1) + 1, ib = 0; ib < pcache->nblocks; ib++)
 	{
 		pbh = &pcache->headers[ib];
 
-		/* on cherche rm minimal */
+		//on cherche rm minimal
 		rm = getPriority(pbh->flags & REFER, pbh->flags & MODIF);
 		// si rm vaut 0 alors on ne peut pas trouver plus petit
 		if (rm == 0) 
 			return pbh;
-		/* s'il est plus petit que celui qu'on a, on le stocke */
+		// s'il est plus petit que celui qu'on a, on le stocke
 		if (rm < min) 
 		{
 			min = rm;
@@ -99,10 +90,8 @@ struct Cache_Block_Header *Strategy_Replace_Block(struct Cache *pcache)
 	return pbh_save;    
 }
 
-/* Fonctions "réflexes" en cas de lecture et d'écriture
- * ---------------------------------------------------- 
- * On se contente ici de déréférencer si besoin et surtout de marquer le bloc
- * comme ayant été référencé
+/* NUR : Read
+ * Mets le flag à 1
  */
 void Strategy_Read(struct Cache *pcache, struct Cache_Block_Header *pbh) 
 {
@@ -110,16 +99,18 @@ void Strategy_Read(struct Cache *pcache, struct Cache_Block_Header *pbh)
 	pbh->flags |= REFER;
 } 
   
+/* NUR : Write
+ * Mets le flag à 1
+ */
 void Strategy_Write(struct Cache *pcache, struct Cache_Block_Header *pbh)
 {
 	Deref(pcache);
-
 	// On met le flaf REFER à 1
 	pbh->flags |= REFER;
 } 
 
-/* Identification de la stratégie
- * ------------------------------
+/*
+ * Renvoie le nom de la stratégie
  */
 char *Strategy_Name()
 {
