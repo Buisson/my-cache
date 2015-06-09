@@ -14,8 +14,17 @@
 // Flag Reférence
 #define REFER 0b100
 
+// permet de stocker le compteur
+struct pstrategy
+{
+    unsigned nderef;	//Période de déréférençage
+    unsigned cptderef;	// cpt
+};
+
 unsigned int getPriority(struct Cache_Block_Header *bloc) {
-	return ((bloc->flags & REFER) ? 1:0) *2 + ((bloc->flags & MODIF) ? 1:0);
+	int rm = ((bloc->flags & REFER) ? 1:0) << 1;
+	rm |= ((bloc->flags & MODIF) ? 1:0);
+	return rm;
 }
 
 /* NUR : déréférençage
@@ -24,19 +33,24 @@ unsigned int getPriority(struct Cache_Block_Header *bloc) {
 void Deref (struct Cache *pcache)
 {
 
-	if (pcache->nderef > 0 ) {
+	if (pcache->nderef == 0) return;
+
 		// On met le flag REFER à 0 à tous les blocs
 		for (int i = 0; i < pcache->nblocks; ++i) 
 			pcache->headers[i].flags &= ~REFER;
 		++pcache->instrument.n_deref;
-	}
+	
 }
 
 /* NUR : initialisation
  */
 void *Strategy_Create(struct Cache *pcache) 
 {
-	return pcache->pstrategy = (int*)0;
+	struct pstrategy *strategy = malloc(sizeof(struct pstrategy));
+	// Initialisation des champs de la structure
+	strategy->nderef = pcache->nderef;
+	strategy->cptderef = 0;
+	return strategy;
 }
 
 /* NUR : Strategy_Close
@@ -44,7 +58,7 @@ void *Strategy_Create(struct Cache *pcache)
  */
 void Strategy_Close(struct Cache *pcache)
 {
-	//free(pcache->pstrategy);
+	free(pcache->pstrategy);
 }
 
 /* NUR : Invalidate
@@ -61,7 +75,6 @@ void Strategy_Invalidate(struct Cache *pcache)
  */
 struct Cache_Block_Header *Strategy_Replace_Block(struct Cache *pcache) 
 {
-	int rm_min;
 	struct Cache_Block_Header *pbh_save = NULL;
 	struct  Cache_Block_Header *pbh;
 	int rm;
@@ -70,11 +83,12 @@ struct Cache_Block_Header *Strategy_Replace_Block(struct Cache *pcache)
 		return pbh;
 	//à partir de là on commence l'algorithme concret de NUR
 	// On parcourt tout les blocks pour trouver celui qui nous intéresse
-	for (int i = 0 ; i < pcache->nblocks; ++i)
+	int i;
+	for (unsigned int rm_min = 4; i < pcache->nblocks; ++i)
 	{
 		struct Cache_Block_Header *cachi = &pcache->headers[i];
 		//on cherche rm minimal
-		rm_min = getPriority(cachi);
+		rm = getPriority(cachi);
 		// si rm vaut 0 alors on ne peut pas trouver plus petit
 		if (rm == 0) 
 			return cachi;
@@ -93,7 +107,9 @@ struct Cache_Block_Header *Strategy_Replace_Block(struct Cache *pcache)
  */
 void Strategy_Read(struct Cache *pcache, struct Cache_Block_Header *pbh) 
 {
-	if (++pcache->pstrategy >= pcache->nderef)
+	struct pstrategy *strategy = (struct pstrategy*)(pcache)->pstrategy;
+	// Si le compteur de déréférencements est égal à nderef, on réinitialise
+	if((++strategy->cptderef) == strategy->nderef)
 		Deref(pcache);
 	pbh->flags |= REFER;
 } 
@@ -103,9 +119,10 @@ void Strategy_Read(struct Cache *pcache, struct Cache_Block_Header *pbh)
  */
 void Strategy_Write(struct Cache *pcache, struct Cache_Block_Header *pbh)
 {
-if ((++pcache->pstrategy) >= pcache->nderef)
+	struct pstrategy *strategy = (struct pstrategy*)(pcache)->pstrategy;
+	// Si le compteur de déréférencements est égal à nderef, on réinitialise
+	if((++strategy->cptderef) == strategy->nderef)
 		Deref(pcache);
-	// On met le flaf REFER à 1
 	pbh->flags |= REFER;
 } 
 
