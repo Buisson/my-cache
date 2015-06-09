@@ -53,7 +53,16 @@ Cache_Error Cache_Close(struct Cache *pcache){
 
 //! Synchronisation du cache.
 Cache_Error Cache_Sync(struct Cache *pcache){
-
+	int fd = fileno(pcache->fp), i;
+	for(i=0 ; i< pcache->nblocks ; i++){
+		struct Cache_Block_Header *header = pcache->headers+i;
+		if( header->flags & MODIF){
+			char* data = header->data;
+			lseek(fd, pcache->recordsz*header->ibfile, SEEK_SET);
+			write(fd, data, pcache->recordsz);
+		}
+	}
+	return CACHE_OK;
 };
 
 //! Invalidation du cache.
