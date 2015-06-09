@@ -24,7 +24,7 @@ unsigned int getPriority(struct Cache_Block_Header *bloc) {
 void Deref (struct Cache *pcache)
 {
 
-	if (pcache->nderef 0 ) {
+	if (pcache->nderef > 0 ) {
 		// On met le flag REFER à 0 à tous les blocs
 		for (int i = 0; i < pcache->nblocks; ++i) 
 			pcache->headers[i].flags &= ~REFER;
