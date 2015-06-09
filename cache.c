@@ -30,11 +30,11 @@
 	//cache->pstrategy = NULL;			//!< Structure de données dépendant de la stratégie
 
 	struct Cache_Instrument instrument;
-	instrument->n_reads = 0; 	//!< Nombre de lectures.
-    instrument->n_writes = 0;	//!< Nombre d'écritures.
-    instrument->n_hits = 0;		//!< Nombre de fois où l'élément était déjà dans le cache->
-    instrument->n_syncs = 0;	//<! Nombre d'appels à Cache_Sync().
-    instrument->n_deref = 0;
+	instrument.n_reads = 0; 	//!< Nombre de lectures.
+    instrument.n_writes = 0;	//!< Nombre d'écritures.
+    instrument.n_hits = 0;		//!< Nombre de fois où l'élément était déjà dans le cache->
+    instrument.n_syncs = 0;	//<! Nombre d'appels à Cache_Sync().
+    instrument.n_deref = 0;
 
     cache->instrument = instrument;
 
