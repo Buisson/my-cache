@@ -19,7 +19,7 @@
  	size_t recordsz, unsigned nderef){
 
  	struct Cache *cache = (struct Cache*) malloc(sizeof(struct Cache));
- 	
+
 	cache->file=basename(fic);			//!< Nom du fichier   
 	cache->FILE = fopen(fic, "a+");		//!< Pointeur sur fichier, option 'a+' (Opens a file for reading and appending.)
 	cache.nblocks = nblocks;			//!< Nb de blocs dans le cache
@@ -38,9 +38,16 @@
 
     cache.instrument = instrument;
 
-	//Je crois qu'on a pas besoin de ça ici
-    //struct Cache_Block_Header *pfree;   //!< Premier bloc libre (invalide) 
-    //struct Cache_Block_Header *headers; //!< Les données elles-mêmes 
+	struct Cache_Block_Header *headers = (struct Cache_Block_Header*) malloc(sizeof(struct Cache_Block_Header)*nblocks);
+	for(int i=0 ; i< nblocks ; i++){
+		(headers+i)->flags=VALID;
+		(headers+i)->ibfile=0;
+		(headers+i)->ibcache=0;
+	}
+
+	cache->headers=headers;
+	cache->pfree=Get_Free_Block(cache);
+ 
     return &cache;
 };
 
