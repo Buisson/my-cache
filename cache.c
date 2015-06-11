@@ -131,6 +131,14 @@ Cache_Error Cache_Read(struct Cache *pcache, int irfile, void *precord){
 }
 
 //! Résultat de l'instrumentation.
-struct Cache_Instrument *Cache_Get_Instrument(struct Cache *pcache){
-	return &pcache->instrument;
+// retourne les stats et les reinit
+struct Cache_Instrument *Cache_Get_Instrument(struct Cache *pcache)
+{
+	struct Cache_Instrument instrument = pcache->instrument;
+	pcache->instrument.n_reads = 0;
+	pcache->instrument.n_writes = 0;
+	pcache->instrument.n_hits = 0;
+	pcache->instrument.n_syncs = 0;
+	pcache->instrument.n_deref = 0;
+	return &instrument;
 }
