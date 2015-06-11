@@ -39,16 +39,19 @@
 
     cache->instrument = instrument;
 
-	struct Cache_Block_Header *headers = (struct Cache_Block_Header*) malloc(sizeof(struct Cache_Block_Header)*nblocks);
-	for(int i=0 ; i < nblocks ; i++){
-		(headers+i)->flags=VALID;
-		(headers+i)->ibfile=0;
-		(headers+i)->ibcache=0;
-	}
+    struct Cache_Block_Header *headers = (struct Cache_Block_Header*) malloc(sizeof(struct Cache_Block_Header)*nblocks);
 
-	cache->headers=headers;
-	cache->pfree=Get_Free_Block(cache);
- 
+	//initialisation des headers
+    for(int i = 0 ; i < nblocks ; ++i){
+    	cache->headers[i].ibcache = i;
+    	cache->headers[i].flags = 0;
+    	cache->headers[i].data = malloc(nrecords * recordsz);
+    }
+
+    cache->headers=headers;
+    cache->pfree=Get_Free_Block(cache);
+	//cache->pfree = &cache->headers[0];
+
     return &cache;
 }
 
@@ -80,20 +83,54 @@ Cache_Error Cache_Invalidate(struct Cache *pcache){
 	for(i=0 ; i< pcache->nblocks ; i++)
 		if((pcache->headers+i)->flags & VALID)
 			(pcache->headers+i)->flags-=VALID;
-	return CACHE_OK;
-}
+		return CACHE_OK;
+	}
 
-//! Lecture  (à travers le cache).
+
+//! retourne le block en fonction de l'indice d'enregistrement dans le fichier
+	struct Cache_Block_Header * getBlockByIbfile(struct Cache *pcache, int irfile){
+// Indice du bloc contenant l'enregistrement
+		int ibSearch = irfile / pcache->nrecords;
+		for(int i = 0 ; i < pcache->nblocks ; ++i){
+if(pcache->headers[i].flags & VALID){//si le block est valide
+if(pcache->headers[i].ibfile == ibSearch)//si il contient les bonnes infos
+	return &pcache->headers[i];
+}
+}
+return NULL;
+}
+//! retourne le block correspondant a l'irfile passé en param
+struct Cache_Block_Header * Read_In_Cache(struct Cache *pcache, int irfile){
+	struct Cache_Block_Header * header = getBlockByIbfile(pcache, irfile);
+	//si le block n'est pas dans le cache
+	if(header == NULL){
+		header = Strategy_Replace_Block(pcache);
+		header->ibfile = irfile / pcache->nrecords;
+		if(fseek(pcache->fp, DADDR(pcache, header->ibfile), SEEK_SET) != 0) return CACHE_KO;
+		if(fgets(header->data, pcache->blocksz, pcache->fp) == EOF) return CACHE_KO;
+		//MAJ des flags
+		header->flags |=VALID;
+		header->flags &= ~MODIF;
+	} else
+	{
+		//l'élément est dans le cache
+		pcache->instrument.n_hits++;
+	}
+	return header;
+}
+//! Lecture (à travers le cache).
 Cache_Error Cache_Read(struct Cache *pcache, int irfile, void *precord){
-	return CACHE_OK;
-}
-
-//! Écriture (à travers le cache).
-Cache_Error Cache_Write(struct Cache *pcache, int irfile, const void *precord){
+	struct Cache_Block_Header * header = Read_In_Cache(pcache, irfile);
+		//on copie dans le buffer
+	memcpy(precord, ADDR(pcache, irfile, header) , pcache->recordsz);
+		//+1 au nombre de lecture
+	pcache->instrument.n_reads++;
+	Check_Synchronisation(pcache);
+	Strategy_Read(pcache, header);
 	return CACHE_OK;
 }
 
 //! Résultat de l'instrumentation.
 struct Cache_Instrument *Cache_Get_Instrument(struct Cache *pcache){
-
+	return &pcache->instrument;
 }
