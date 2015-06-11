@@ -76,8 +76,8 @@ set xlabel "$XTitle"
 set ylabel "Hit rate (%)" font "Helvetica-Oblique"
 set label "$Title (test $TestNum)" font "Helvetica-Bold,18" at $LabelPos 
 set encoding utf8
-set terminal postscript eps color
-set output "$Out.eps"
+set terminal png size 1000, 1000
+set output "$Out.png"
 plot "$Out" using 1:2 t "NUR", "$Out" using 1:3 t "LRU", "$Out" using 1:4 t "FIFO", "$Out" using 1:5 t "RAND"
 .
 w $Out.gp
