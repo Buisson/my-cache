@@ -1,251 +1,142 @@
-#include "low_cache.h"
+/*!
+ * \file low_cache.c
+ * 
+ * \author Thibaut SORIANO
+ * \author Aina Rapenomanana
+ * \author Pascal Tung
+ */
+
+#include <stdlib.h>
 #include "cache_list.h"
 
-#include <stdbool.h>
+/*! Création d'une liste de blocs */
+struct Cache_List *Cache_List_Create()
+{
+    struct Cache_List* new_list = (struct Cache_List*)malloc(sizeof(struct Cache_List));
+    new_list->pheader = NULL;
+    new_list->prev    = new_list;
+    new_list->next    = new_list;
 
-void debug_List(struct Cache_List *list){
-	struct Cache_List *tmp=list;
-	while ((tmp) != NULL) {
-		printf("%p--%p\n",tmp,tmp->next);
-		tmp=tmp->next;
-	}
+    return new_list;
 }
 
-struct Cache_List *Cache_List_Create(){
-	printf("Cache_List_Create\n");
-	struct Cache_List* ptrLst = malloc(sizeof(struct Cache_List));
-	ptrLst->pheader=NULL;
-	ptrLst->next=NULL;
-	ptrLst->prev=NULL;
+/*! Destruction d'une liste de blocs */
+void Cache_List_Delete(struct Cache_List *list)
+{
+    if (!Cache_List_Is_Empty(list))
+    {
+       for (struct Cache_List* tmp = list->next; tmp != list; tmp = tmp->next)
+        {
+            tmp->pheader    = NULL;
+            tmp->prev->next = tmp->next;
+            tmp->next->prev = tmp->prev;
+            free(tmp);
+        }
+    }
 
-	return ptrLst;
+    list->pheader = NULL;
+    free(list);
 }
 
-void Cache_List_Delete(struct Cache_List *list){
-	printf("iciCache_List_Delete\n");	
-	struct Cache_List *current = list;
-	
-	while(current != NULL){
-		struct Cache_List *tmp = current;		
-		current = current->next;
-		free(tmp);
-	}
+/*! Insertion d'un élément à la fin */
+void Cache_List_Append(struct Cache_List *list, struct Cache_Block_Header *pbh)
+{
+    struct Cache_List *new_elem = Cache_List_Create();
+    new_elem->pheader = pbh;
+
+    struct Cache_List *last = list->next;
+    for (; last != list; last = last->next);
+
+    new_elem->prev   = last->prev;
+    last->prev->next = new_elem;
+    last->prev       = new_elem;
+    new_elem->next   = last;
 }
 
-void Cache_List_Append(struct Cache_List *list, struct Cache_Block_Header *pbh){
-	printf("iciAppend\n");	
-	/*if(Cache_List_Is_Empty(list)){
-		list->pheader=pbh;
-	} else {*/
-		struct Cache_List* new = malloc(sizeof(struct Cache_List*));//Cache_List_Create();
-		if(new == NULL){
-			perror("Erreur de malloc dans append\n");
-		}
-		struct Cache_List* tmp = list;
-		// on parcourt la liste pour récupérer le dernier
-		while ((tmp->next) != NULL) {
-			tmp = tmp->next;
-		}
-		new->prev = tmp;
-		new->pheader = pbh;
-		tmp->next = new;
-		/*print la liste*//*
-		tmp=list;
-		while ((tmp) != NULL) {
-			printf("%p--%p\n",tmp,tmp->next);
-			tmp=tmp->next;
-		}
-		printf("\n\nREMOVE:%p\n",list->next);
-		Cache_List_Remove(list,list->next->pheader);
-		tmp=list;
-		while ((tmp) != NULL) {
-			printf("%p--%p\n",tmp,tmp->next);
-			tmp=tmp->next;
-		}*/
-		printf("\n\nFINAppend\n");
-		debug_List(list);
-		//exit(0);
-	//}
-	
+/*! Insertion d'un élément au début*/
+void Cache_List_Prepend(struct Cache_List *list, struct Cache_Block_Header *pbh)
+{
+    struct Cache_List *new_elem = Cache_List_Create();
+    new_elem->pheader = pbh;
+
+    struct Cache_List *second = list->next;
+
+    new_elem->prev     = second->prev;
+    second->prev->next = new_elem;
+    second->prev       = new_elem;
+    new_elem->next     = second;
 }
 
-void Cache_List_Prepend(struct Cache_List *list, struct Cache_Block_Header *pbh){
-	printf("iciPrepend\n");
-	if(Cache_List_Is_Empty(list)){
-		list->pheader=pbh;
-	} else {	
-		struct Cache_List* new = Cache_List_Create();
-		new->pheader = pbh;
-		if (Cache_List_Is_Empty(list)) {
-			list = new;
-		} else {
-			struct Cache_List* tmp = Cache_List_Create();
-			while (tmp->prev != NULL) tmp = tmp->prev;
-			new->next = tmp;
-			tmp->prev = new;
-		}
-	}
+/*! Retrait du premier élément */
+struct Cache_Block_Header *Cache_List_Remove_First(struct Cache_List *list)
+{
+    struct Cache_List* first = list->next;
+                    
+    first->prev->next = first->next;
+    first->next->prev = first->prev;
+
+    struct Cache_Block_Header *header = first->pheader;
+    free(first);
+    return header;
 }
 
+/*! Retrait du dernier élément */
+struct Cache_Block_Header *Cache_List_Remove_Last(struct Cache_List *list)
+{
+    struct Cache_List* last;
+    for (last = list->next; last != list; last = last->next);
 
-struct Cache_Block_Header *Cache_List_Remove_First(struct Cache_List *list){
-	printf("iciCache_List_Remove_First\n");	
-	if(!Cache_List_Is_Empty(list)){	
-		//struct Cache_List* tmp = list;
-		/*while (tmp->next != NULL) 
-			tmp = tmp->next;*/
-		//struct Cache_Block_Header *bheader = list->next->pheader;
-		//tmp->next = tmp->next->next;
-		//Cache_List_Delete(tmp->prev);
+    last->prev->next = last->next;
+    last->next->prev = last->prev;
 
-		return Cache_List_Remove(list,list->next->pheader);
-	}
-	return NULL;
+    struct Cache_Block_Header *header = last->pheader;
+    free(last);
+    return header;
 }
 
+/*! Retrait d'un élément quelconque */
+struct Cache_Block_Header *Cache_List_Remove(struct Cache_List *list, struct Cache_Block_Header *pbh)
+{
+    struct Cache_List* el = list;
+    for (el = list->next; el->pheader != pbh; el = el->next);
+            
+    el->prev->next = el->next;  
+    el->next->prev = el->prev;
 
-struct Cache_Block_Header *Cache_List_Remove_Last(struct Cache_List *list){
-	printf("iciCache_List_Remove_Last\n");
-	if(!Cache_List_Is_Empty(list)){	
-		struct Cache_List *tmp = list;
-		while(tmp->next!=NULL){
-			tmp = tmp->next;
-		}
-		return Cache_List_Remove(list,tmp->pheader);
-	}
-	return NULL;
+    struct Cache_Block_Header *header = el->pheader;
+    free(el);
+    return header;
 }
 
-struct Cache_Block_Header *Cache_List_Remove(struct Cache_List *list,struct Cache_Block_Header *pbh){
-	printf("Cache_List_Remove Valeur de list : %p && valeur de pbh: %p\n",list,pbh);
-	printf("ETAT DE LA LISTE AVANT LE REMOVE :\n");
-	debug_List(list);
-	struct Cache_List* tmp = list;
-	if (Cache_List_Is_Empty(list)) {
-		printf("AHAHAHAHAHAH t'es con alex\n");
-	}
-	//for (tmp = list; tmp->pheader != pbh && tmp->next != NULL;tmp = tmp->next) {}
-	while(tmp!=NULL){
-		//printf("header : %p\n",tmp->pheader);
-		if (pbh == tmp->pheader) {
-			printf("REMOVE : pbh : %p\n",pbh);
-			//struct Cache_Block_Header* htmp = tmp->pheader;
-			//printf("%p\n",htmp);
-			//printf("CACACA%p\n",tmp);
-			/*if(htmp==NULL && pbh == NULL){
-				printf("EROORROROORO\n");
-			}*/
-			//printf("ici ?\n");
-			printf("SUPPRESSION DE : %p\n",tmp);
-			//printf("LE NEXT : %p\n",tmp->next);
-			/*
-			if(tmp->prev != NULL && tmp->next != NULL){
-				tmp->prev->next = tmp->next;
-				tmp->next->prev = tmp->prev;
-			}
-			if(tmp->prev != NULL && tmp->next==NULL){
-				tmp->prev->next = NULL;
-				
-			}*/
-			if(tmp->prev != NULL){
-				if(tmp->next == NULL){
-					tmp->prev->next = NULL;
-					//printf("segfault?\n");
-					//tmp->next->prev = tmp->prev;
-				}
-				else{
-					tmp->prev->next = tmp->next;
-					tmp->next->prev = tmp->prev;
-				}
-			}
-
-			//printf("hey ?\n");
-			/*if(tmp->next!=NULL) {
-				tmp2 = tmp->next;
-				tmp2->prev = tmp->prev;
-			}*/
-			struct Cache_Block_Header *retour = tmp->pheader;			
-			//tmp->pheader=NULL;
-			printf("##########################################%p############################\n",retour);
-			//printf("##########################################%p############################",tmp->pheader);
-			printf("ETAT DE LA LISTE APRES LE REMOVE :\n");
-			debug_List(list);
-			return retour;
-		}
-		tmp = tmp->next;
-	}
-	// au cas où on part dans l'autre sens
-	/*for (tmp = list; tmp->pheader != pbh && tmp->prev != NULL;tmp = tmp->prev) {}
-	printf("REMOVE : deuxième for \n");
-	if((tmp->pheader)==pbh){
-		(tmp->next)->prev = tmp->prev;
-		if(tmp->prev!=NULL)
-			(tmp->prev)->next = tmp->prev;
-		struct Cache_Block_Header *retour = tmp->pheader;			
-		free(tmp);
-		printf("Boucle de prev %p",retour);
-		return retour;
-	}*/
-	return NULL;
-}
-
-
+/*! Remise en l'état de liste vide */
 void Cache_List_Clear(struct Cache_List *list){
-	printf("iciCache_List_Clear\n");
-	Cache_List_Delete(list);
-	list = Cache_List_Create();
+    for (struct Cache_List* tmp = list->next; tmp != list; tmp = tmp->next)
+    {
+        tmp->pheader    = NULL;
+        tmp->prev->next = tmp->next;
+        tmp->next->prev = tmp->prev;
+        free(tmp);
+    }
+
+    list->pheader = NULL;
 }
 
+/*! Test de liste vide */
 bool Cache_List_Is_Empty(struct Cache_List *list){
-	printf("iciCache_List_Is_Empty\n");
-	printf("retour de empty : %d\n",(list->pheader==NULL && list->next==NULL && list->prev==NULL) ? true : false);
-	return (list->pheader==NULL && list->next==NULL && list->prev==NULL) ? true : false;
+    return list->next == list->prev;
 }
 
-void Cache_List_Move_To_End(struct Cache_List *list,struct Cache_Block_Header *pbh){	
-	printf("iciCache_List_Move_To_End pbh:%p\n",pbh);
-	/*if(!Cache_List_Is_Empty(list)){
-		struct Cache_List * tmp = list;
-		while((tmp->next) != NULL){
-			if(tmp->pheader == pbh){
-				tmp->prev->next = tmp->next;
-
-				tmp->next->prev = tmp->prev;
-	
-
-				tmp->next = NULL;
-	
-				struct Cache_List *temp = list;
-				while(temp->next!=NULL){
-					temp = temp->next;
-				}
-				temp->next = tmp;	
-				tmp->prev = temp;
-			}
-			break;			
-
-			tmp=tmp->next;		
-		}
-	}*/
-	if(!Cache_List_Is_Empty(list)){
-		struct Cache_Block_Header *header = Cache_List_Remove(list, pbh);
-		Cache_List_Append(list, header);
-	}
+/*! Transférer un élément à la fin */
+void Cache_List_Move_To_End(struct Cache_List *list, struct Cache_Block_Header *pbh)
+{
+    Cache_List_Remove(list, pbh);
+    Cache_List_Append(list, pbh);
 }
 
-void Cache_List_Move_To_Begin(struct Cache_List *list,struct Cache_Block_Header *pbh){
-	printf("iciCache_List_Move_To_Begin\n");	
-	struct Cache_List * tmp;
-	while((tmp = list->next) != NULL){
-		if(tmp->pheader == pbh){
-			tmp->prev->next = tmp->next;
-			tmp->next->prev = tmp->prev;
-			
-			tmp->prev = list;
-			list->next->prev = tmp;			
-			tmp->next = list->next;
-			list->next = tmp;
-			break;			
-		}				
-	}
+/*! Transférer un élément  au début */
+void Cache_List_Move_To_Begin(struct Cache_List *list, struct Cache_Block_Header *pbh)
+{
+    Cache_List_Remove(list, pbh);
+    Cache_List_Prepend(list, pbh);
 }
+
