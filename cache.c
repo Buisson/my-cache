@@ -64,10 +64,22 @@
 //! Fermeture (destruction) du cache.
 // Alex : ? Insuffisant peut être
 Cache_Error Cache_Close(struct Cache *pcache) {
-	free(pcache->headers);
-	free(pcache->pfree);
-	free(pcache);
-	return CACHE_OK;
+	//synchronise cache / fichier
+    if(Cache_Sync(pcache) == CACHE_KO) return CACHE_KO;
+    //close le fichier
+    if(fclose(pcache->fp) != 0) return CACHE_KO;
+    //Ferme la strategie
+    Strategy_Close(pcache);
+
+    //on free les datas
+    for(int i = 0 ; i < pcache->nblocks ; ++i)
+        free(pcache->headers[i].data);
+
+    //free de la struct cache
+    free(pcache->headers);
+    free(pcache);
+
+    return CACHE_OK;
 }
 
 //! Synchronisation du cache.
@@ -95,16 +107,16 @@ Cache_Error Cache_Invalidate(struct Cache *pcache){
 
 
 //! retourne le block en fonction de l'indice d'enregistrement dans le fichier
-	struct Cache_Block_Header * getBlockByIbfile(struct Cache *pcache, int irfile){
-// Indice du bloc contenant l'enregistrement
-		int ibSearch = irfile / pcache->nrecords;
-		for(int i = 0 ; i < pcache->nblocks ; ++i){
-if(pcache->headers[i].flags & VALID){//si le block est valide
-if(pcache->headers[i].ibfile == ibSearch)//si il contient les bonnes infos
-	return &pcache->headers[i];
-}
-}
-return NULL;
+struct Cache_Block_Header * getBlockByIbfile(struct Cache *pcache, int irfile){
+	// Indice du bloc contenant l'enregistrement
+	int ibSearch = irfile / pcache->nrecords;
+	for(int i = 0 ; i < pcache->nblocks ; ++i){
+	if(pcache->headers[i].flags & VALID){//si le block est valide
+		if(pcache->headers[i].ibfile == ibSearch)//si il contient les bonnes infos
+			return &pcache->headers[i];
+		}
+	}
+	return NULL;
 }
 //! retourne le block correspondant a l'irfile passé en param
 struct Cache_Block_Header * Read_In_Cache(struct Cache *pcache, int irfile){
