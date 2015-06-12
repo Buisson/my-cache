@@ -6,16 +6,23 @@
  * \author Dorian Blanc
  *
  */
-#include <stdlib.h>
-#include <stdio.h>
+
 #include "low_cache.h"
+#include "cache.h"
+#include "strategy.h"
+#include <libgen.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <string.h>
 
 //! Calcul du hit rate
+// Alex : OK
  int Hit_Rate_Compute(struct Cache *pcache){
  	return pcache->instrument.n_hits / (pcache->instrument.n_reads + pcache->instrument.n_writes);
  }
 
 //! Création du cache.
+// Alex : OK
  struct Cache *Cache_Create(const char *fic, unsigned nblocks, unsigned nrecords,
  	size_t recordsz, unsigned nderef){
 
@@ -47,16 +54,16 @@
     	cache->headers[i].flags = 0;
     	cache->headers[i].data = malloc(nrecords * recordsz);
     }
-
     cache->headers=headers;
     cache->pfree=Get_Free_Block(cache);
 	//cache->pfree = &cache->headers[0];
 
-    return &cache;
+    return cache;
 }
 
 //! Fermeture (destruction) du cache.
-Cache_Error Cache_Close(struct Cache *pcache){
+// Alex : ? Insuffisant peut être
+Cache_Error Cache_Close(struct Cache *pcache) {
 	free(pcache->headers);
 	free(pcache->pfree);
 	free(pcache);
@@ -121,10 +128,11 @@ struct Cache_Block_Header * Read_In_Cache(struct Cache *pcache, int irfile){
 //! Lecture (à travers le cache).
 Cache_Error Cache_Read(struct Cache *pcache, int irfile, void *precord){
 	struct Cache_Block_Header * header = Read_In_Cache(pcache, irfile);
-		//on copie dans le buffer
+	//on copie dans le buffer
 	memcpy(precord, ADDR(pcache, irfile, header) , pcache->recordsz);
-		//+1 au nombre de lecture
+	//+1 au nombre de lecture
 	pcache->instrument.n_reads++;
+	
 	Check_Synchronisation(pcache);
 	Strategy_Read(pcache, header);
 	return CACHE_OK;
@@ -132,9 +140,11 @@ Cache_Error Cache_Read(struct Cache *pcache, int irfile, void *precord){
 
 //! Résultat de l'instrumentation.
 // retourne les stats et les reinit
+// Alex : OK
 struct Cache_Instrument *Cache_Get_Instrument(struct Cache *pcache)
 {
-	struct Cache_Instrument instrument = pcache->instrument;
+	static struct Cache_Instrument instrument;
+	instrument = pcache->instrument;
 	pcache->instrument.n_reads = 0;
 	pcache->instrument.n_writes = 0;
 	pcache->instrument.n_hits = 0;
