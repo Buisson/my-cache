@@ -15,6 +15,9 @@
 #include <unistd.h>
 #include <string.h>
 
+//compteur de lecture / ecriture
+int cptSynchro;
+
 //! Calcul du hit rate
 // Alex : OK
  int Hit_Rate_Compute(struct Cache *pcache){
@@ -63,6 +66,7 @@
 
 //! Fermeture (destruction) du cache.
 // Alex : ? Insuffisant peut être
+// Dorian : corrigé
 Cache_Error Cache_Close(struct Cache *pcache) {
 	//synchronise cache / fichier
     if(Cache_Sync(pcache) == CACHE_KO) return CACHE_KO;
@@ -137,6 +141,7 @@ struct Cache_Block_Header * Read_In_Cache(struct Cache *pcache, int irfile){
 	}
 	return header;
 }
+
 //! Lecture (à travers le cache).
 Cache_Error Cache_Read(struct Cache *pcache, int irfile, void *precord){
 	struct Cache_Block_Header * header = Read_In_Cache(pcache, irfile);
@@ -145,9 +150,27 @@ Cache_Error Cache_Read(struct Cache *pcache, int irfile, void *precord){
 	//+1 au nombre de lecture
 	pcache->instrument.n_reads++;
 	
-	Check_Synchronisation(pcache);
+	if(++cptSynchro == NSYNC)
+        Cache_Sync(pcache);
 	Strategy_Read(pcache, header);
+	
 	return CACHE_OK;
+}
+
+//! Écriture (à travers le cache).
+Cache_Error Cache_Write(struct Cache *pcache, int irfile, const void *precord){
+    struct Cache_Block_Header * header = Read_In_Cache(pcache, irfile);
+    //on copie dans le bloc
+    memcpy(ADDR(pcache, irfile, header), precord, pcache->recordsz);
+    header->flags |= MODIF;
+    //+1 au nombre d'écriture
+    pcache->instrument.n_writes++;
+
+    if(++cptSynchro == NSYNC)
+        Cache_Sync(pcache);
+    Strategy_Write(pcache, header);
+
+    return CACHE_OK;
 }
 
 //! Résultat de l'instrumentation.
