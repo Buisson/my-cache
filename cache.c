@@ -26,44 +26,36 @@ int cptSynchro;
 
 //! Création du cache.
 // Alex : OK
- struct Cache *Cache_Create(const char *fic, unsigned nblocks, unsigned nrecords,
- 	size_t recordsz, unsigned nderef){
+ //! Création du cache.
+struct Cache *Cache_Create(const char *fic, unsigned nblocks, unsigned nrecords,
+                           size_t recordsz, unsigned nderef){
+    //creation de la struct
+    struct Cache * cache = malloc(sizeof(struct Cache));
+    cache->file = fic;
+    cache->fp = fopen(fic, "wb+");
+    cache->nblocks = nblocks;
+    cache->nderef = nderef;
+    cache->blocksz = recordsz * nrecords;
+    cache->nrecords = nrecords;
+    cache->recordsz = recordsz;
+    cache->pstrategy = Strategy_Create(cache);
+    Cache_Get_Instrument(cache);
+    struct Cache_Block_Header * headers = malloc(sizeof(struct Cache_Block_Header) * nblocks);
+    cache->headers = headers;
 
- 	struct Cache *cache = (struct Cache*) malloc(sizeof(struct Cache));
-
-	cache->file = basename(fic);		//!< Nom du fichier   
-	cache->fp = fopen(fic, "a+");		//!< Pointeur sur fichier, option 'a+' (Opens a file for reading and appending.)
-	cache->nblocks = nblocks;			//!< Nb de blocs dans le cache
-	cache->nrecords = nrecords;			//!< Nombre d'enregistrements dans chaque bloc
-	cache->recordsz = recordsz;			//!< Taille d'un enregistrement
-	cache->blocksz = recordsz*nrecords; //!< Taille d'un bloc.
-	cache->nderef = nderef;				//!< période de déréférençage pour NUR 
-	//cache->pstrategy = NULL;			//!< Structure de données dépendant de la stratégie
-
-	struct Cache_Instrument instrument;
-	instrument.n_reads = 0; 	//!< Nombre de lectures.
-    instrument.n_writes = 0;	//!< Nombre d'écritures.
-    instrument.n_hits = 0;		//!< Nombre de fois où l'élément était déjà dans le cache->
-    instrument.n_syncs = 0;	//<! Nombre d'appels à Cache_Sync().
-    instrument.n_deref = 0;
-
-    cache->instrument = instrument;
-
-    struct Cache_Block_Header *headers = (struct Cache_Block_Header*) malloc(sizeof(struct Cache_Block_Header)*nblocks);
-
-	//initialisation des headers
+    //initialisation des headers
     for(int i = 0 ; i < nblocks ; ++i){
-    	cache->headers[i].ibcache = i;
-    	cache->headers[i].flags = 0;
-    	cache->headers[i].data = malloc(nrecords * recordsz);
+        cache->headers[i].ibcache = i;
+        cache->headers[i].flags = 0;
+        cache->headers[i].data = malloc(nrecords * recordsz);
     }
-    cache->headers=headers;
-    cache->pfree=Get_Free_Block(cache);
-	//cache->pfree = &cache->headers[0];
+
+    //initialisation du premier block free
+    cache->pfree = &cache->headers[0];
+    cptSynchro = 0;
 
     return cache;
 }
-
 //! Fermeture (destruction) du cache.
 // Alex : ? Insuffisant peut être
 // Dorian : corrigé
@@ -86,18 +78,24 @@ Cache_Error Cache_Close(struct Cache *pcache) {
     return CACHE_OK;
 }
 
-//! Synchronisation du cache.
 Cache_Error Cache_Sync(struct Cache *pcache){
-	int fd = fileno(pcache->fp), i;
-	for(i=0 ; i< pcache->nblocks ; i++){
-		struct Cache_Block_Header *header = pcache->headers+i;
-		if( header->flags & MODIF){
-			char* data = header->data;
-			lseek(fd, pcache->recordsz*header->ibfile, SEEK_SET);
-			write(fd, data, pcache->recordsz);
-		}
-	}
-	return CACHE_OK;
+    //reinit cpt de synchronisation
+    cptSynchro = 0;
+    //+1 au nombre de synchronisation
+    pcache->instrument.n_syncs++;
+
+    for(int i = 0 ; i < pcache->nblocks ; i++){
+        //on regarde si il a été modifié
+        if((pcache->headers[i].flags & MODIF) > 0){
+            if(fseek(pcache->fp, pcache->headers[i].ibfile * pcache->blocksz, SEEK_SET) != 0) return CACHE_KO;
+            if(fputs(pcache->headers[i].data, pcache->fp) == EOF) return CACHE_KO;
+
+            //on remet le bit a modification a 0
+            pcache->headers[i].flags &= ~MODIF;
+        } 
+    }
+    
+    return CACHE_OK;
 }
 
 //! Invalidation du cache.
@@ -153,7 +151,6 @@ Cache_Error Cache_Read(struct Cache *pcache, int irfile, void *precord){
 	if(++cptSynchro == NSYNC)
         Cache_Sync(pcache);
 	Strategy_Read(pcache, header);
-	
 	return CACHE_OK;
 }
 
@@ -165,7 +162,7 @@ Cache_Error Cache_Write(struct Cache *pcache, int irfile, const void *precord){
     header->flags |= MODIF;
     //+1 au nombre d'écriture
     pcache->instrument.n_writes++;
-
+    
     if(++cptSynchro == NSYNC)
         Cache_Sync(pcache);
     Strategy_Write(pcache, header);
